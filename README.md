@@ -18,10 +18,6 @@ AttendanceData AS (
         VendorCode,
         WorkOrderNo,
         WorkManSl,
-        EngagementType,
-        DayDef,
-        Present,
-        Dates,
         SUM(CASE 
                 WHEN EngagementType = 'ManPowerSupply' AND Present = 'True' THEN 
                     CASE WHEN DayDef = 'HF' THEN 0.5 ELSE 1.00 END 
@@ -36,7 +32,8 @@ AttendanceData AS (
                 ELSE 0.00 
             END) AS NoOfDaysAbsMP
     FROM App_AttendanceDetails
-    GROUP BY MasterID, AadharNo, VendorCode, WorkOrderNo, WorkManSl, EngagementType, DayDef, Present, Dates
+    WHERE YEAR(Dates) = 2024 AND MONTH(Dates) = 11
+    GROUP BY MasterID, AadharNo, VendorCode, WorkOrderNo, WorkManSl
 ),
 
 -- Step 3: Precompute Employee Details
@@ -61,9 +58,6 @@ WagesData AS (
         MasterID,
         WorkOrderNo,
         WorkManSl,
-        MonthWage,
-        YearWage,
-        LocationCode,
         MAX(CASE WHEN Basic_rate IS NOT NULL THEN Basic_rate ELSE Basic END) AS BasicRate,
         MAX(CASE WHEN Da_rate IS NOT NULL THEN Da_rate ELSE DA END) AS DARate,
         MAX(CASE WHEN OtherAllow IS NOT NULL THEN OtherAllow ELSE Allowance END) AS OtherAllow,
@@ -73,19 +67,16 @@ WagesData AS (
         MAX(CashPaymentAmt) AS CashPaymentAmt,
         MAX(OtherDeduAmt) AS OtherDeduAmt
     FROM App_WagesDetailsJharkhand
-    LEFT JOIN App_EmployeeMaster ON App_WagesDetailsJharkhand.AadharCard = App_EmployeeMaster.AadharCard
-    GROUP BY MasterID, WorkOrderNo, WorkManSl, MonthWage, YearWage, LocationCode
+    GROUP BY MasterID, WorkOrderNo, WorkManSl
 ),
 
 -- Step 5: Calculate Total Days and Sundays in a Month
 MonthData AS (
     SELECT 
-        YEAR(Dates) AS YearWage,
-        MONTH(Dates) AS MonthWage,
-        DAY(EOMONTH(Dates)) AS TotDaysInMonth,
-        DATEDIFF(WEEK, DATEADD(MONTH, DATEDIFF(MONTH, 0, Dates), 0), EOMONTH(Dates)) AS TotSunDays
-    FROM App_AttendanceDetails
-    WHERE Dates BETWEEN '2024-11-01' AND '2024-11-30'
+        2024 AS YearWage,
+        11 AS MonthWage,
+        DAY(EOMONTH('2024-11-01')) AS TotDaysInMonth,
+        DATEDIFF(WEEK, DATEADD(MONTH, DATEDIFF(MONTH, 0, '2024-11-01'), 0), EOMONTH('2024-11-01')) AS TotSunDays
 )
 
 -- Final Query: Combine All Precomputed Data
@@ -113,8 +104,8 @@ SELECT
 FROM AttendanceData AD
 LEFT JOIN EmployeeData ED ON AD.MasterID = ED.MasterID
 LEFT JOIN WagesData WD ON AD.MasterID = WD.MasterID AND AD.WorkOrderNo = WD.WorkOrderNo
-LEFT JOIN MonthData MD ON YEAR(AD.Dates) = MD.YearWage AND MONTH(AD.Dates) = MD.MonthWage
-LEFT JOIN HolidayData HD ON YEAR(AD.Dates) = HD.Year AND MONTH(AD.Dates) = HD.Month
+LEFT JOIN MonthData MD ON 1=1 -- Static data for November 2024
+LEFT JOIN HolidayData HD ON HD.Year = 2024 AND HD.Month = 11
 WHERE AD.VendorCode = '15978'
   AND AD.WorkOrderNo IN ('4700026128', '4700022755')
 ORDER BY ED.WorkManName;
